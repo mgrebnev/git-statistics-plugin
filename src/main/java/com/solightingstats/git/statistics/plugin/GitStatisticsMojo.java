@@ -8,6 +8,7 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
 
 import static com.solightingstats.git.statistics.plugin.utils.DateUtils.getCurrentDateTime;
 
-@Mojo(name = "time")
+@Mojo(name = "show")
 public class GitStatisticsMojo extends AbstractMojo {
     
     @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
@@ -29,7 +30,7 @@ public class GitStatisticsMojo extends AbstractMojo {
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         String now = getCurrentDateTime();
-
+        
         getLog().info("#### Start executing time: " + now + " ####");
         getLog().info("-------- [Configuration] ----- ");
         getLog().info("| Project directory: " + projectDirectory.getAbsolutePath());
@@ -57,22 +58,22 @@ public class GitStatisticsMojo extends AbstractMojo {
                     .map((path) -> projectDirectory.toPath().relativize(path))
                     .collect(Collectors.toList());
 
-            getLog().info("Files count: " + paths.size());
-
             Map<String, Contributor> contributors = new HashMap<>();
 
             getLog().info("");
             getLog().info("#### Start collect statistics ####");
+            getLog().info("Parsing...");
+            
+            Integer countErrors = 0;
+            
+            Long trackedFilesCount = 0L;
 
-            Long filesCount = 0l;
-
-            paths.forEach((path) -> {
+            for (Path path: paths) {
                 try {
-                    //System.out.println(path);
-                    System.out.println(git.status().addPath("src/main/java/ru/tn/school/account/controllers/RegistrationController.java").call().getIgnoredNotInIndex());
-
-                    git
-                            .log()
+                    // lol, but i not found way check untracked files
+                    Iterable<RevCommit> contributionsIterable = git.log().addPath(path.toString()).call();
+                    if (contributionsIterable.iterator().hasNext()) {
+                        git.log()
                             .addPath(path.toString())
                             .call()
                             .forEach((log) -> {
@@ -87,20 +88,29 @@ public class GitStatisticsMojo extends AbstractMojo {
                                     contributors.put(currentAuthor, contributor);
                                 }
                             });
-                } catch (Exception e) {
+                        ++trackedFilesCount;
+                    }
 
+                } catch (Exception e) {
+                    ++countErrors;
                 }
-            });
+            }
 
             getLog().info("#### End collect statistics   ####");
             getLog().info("");
             getLog().info("---------- [RESULTS] ----------");
+
+            getLog().info("|Parsing files count: " + trackedFilesCount);
+            getLog().info("|Errors count: " + countErrors);
+
             getLog().info("");
 
             // TODO pretty print (count (percent) + table 
             for (Map.Entry<String, Contributor> entry: contributors.entrySet()) {
                 getLog().info(entry.getKey() + ", contributions: " + entry.getValue().getContributionsCount());
             }
+
+            getLog().info("-------------------------------");
         } catch (Exception e) {
             throw new MojoExecutionException("Parsing statistics FAILURE! Error message: " + e.getMessage());
         }
