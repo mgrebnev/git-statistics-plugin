@@ -1,6 +1,8 @@
 package com.solightingstats.git.statistics.plugin;
 
 import com.solightingstats.git.statistics.plugin.model.Contributor;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -83,6 +85,7 @@ public class GitStatisticsMojo extends AbstractMojo {
                                     contributors.get(currentAuthor).addContribution();
                                 } else {
                                     Contributor contributor = new Contributor();
+                                    contributor.setName(currentAuthor);
                                     contributor.setEmail(currentAuthorEmail);
                                     contributor.addContribution();
                                     contributors.put(currentAuthor, contributor);
@@ -105,11 +108,28 @@ public class GitStatisticsMojo extends AbstractMojo {
 
             getLog().info("");
 
-            // TODO pretty print (count (percent) + table 
-            for (Map.Entry<String, Contributor> entry: contributors.entrySet()) {
-                getLog().info(entry.getKey() + ", contributions: " + entry.getValue().getContributionsCount());
-            }
-
+            final MutableInt maxLengthName = new MutableInt(0);
+            
+            contributors.forEach((key, value) -> {
+                if (key.length() >= maxLengthName.getValue()){
+                    maxLengthName.setValue(key.length());
+                }
+            });
+            
+            contributors
+                    .entrySet()
+                    .stream()
+                    .map(Map.Entry::getValue)
+                    .sorted()
+                    .forEach((contributor) -> {
+                        String authorColumn =
+                                contributor.getName().concat(
+                                        StringUtils
+                                                .repeat(" ",maxLengthName.getValue() - contributor.getName().length())
+                                );
+                        getLog().info(authorColumn + " | " + contributor.getContributionsCount());
+                    });
+            
             getLog().info("-------------------------------");
         } catch (Exception e) {
             throw new MojoExecutionException("Parsing statistics FAILURE! Error message: " + e.getMessage());
