@@ -3,6 +3,7 @@ package com.solightingstats.git.statistics.plugin;
 import com.solightingstats.git.statistics.plugin.model.Contributor;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -15,10 +16,8 @@ import org.eclipse.jgit.revwalk.RevCommit;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.text.DecimalFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.solightingstats.git.statistics.plugin.utils.DateUtils.getCurrentDateTime;
@@ -68,7 +67,7 @@ public class GitStatisticsMojo extends AbstractMojo {
             
             Integer countErrors = 0;
             
-            Long trackedFilesCount = 0L;
+            MutableLong trackedFilesCount = new MutableLong(0L);
 
             for (Path path: paths) {
                 try {
@@ -91,7 +90,7 @@ public class GitStatisticsMojo extends AbstractMojo {
                                     contributors.put(currentAuthor, contributor);
                                 }
                             });
-                        ++trackedFilesCount;
+                        trackedFilesCount.increment();
                     }
 
                 } catch (Exception e) {
@@ -109,13 +108,19 @@ public class GitStatisticsMojo extends AbstractMojo {
             getLog().info("");
 
             final MutableInt maxLengthName = new MutableInt(0);
+            final MutableInt countAllContributions = new MutableInt(0);
             
             contributors.forEach((key, value) -> {
                 if (key.length() >= maxLengthName.getValue()){
                     maxLengthName.setValue(key.length());
                 }
+                countAllContributions.add(value.getContributionsCount());
             });
+
+            final DecimalFormat defaultPercentFormat = new DecimalFormat();
+            defaultPercentFormat.setMaximumFractionDigits(2);
             
+            //TODO add general stream for pretty print
             contributors
                     .entrySet()
                     .stream()
@@ -127,7 +132,11 @@ public class GitStatisticsMojo extends AbstractMojo {
                                         StringUtils
                                                 .repeat(" ",maxLengthName.getValue() - contributor.getName().length())
                                 );
-                        getLog().info(authorColumn + " | " + contributor.getContributionsCount());
+                        
+                        Integer authorContributionsCount = contributor.getContributionsCount();
+                        Float contributionsPercent = ((float) authorContributionsCount / (float) countAllContributions.getValue()) * 100.0f;
+                        
+                        getLog().info(authorColumn + " | " + authorContributionsCount + "   [" + defaultPercentFormat.format(contributionsPercent).replace(",", ".") + "%" + "] " );
                     });
             
             getLog().info("-------------------------------");
