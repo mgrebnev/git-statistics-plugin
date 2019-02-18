@@ -17,7 +17,9 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.DecimalFormat;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static com.solightingstats.git.statistics.plugin.utils.DateUtils.getCurrentDateTime;
@@ -28,6 +30,9 @@ public class GitStatisticsMojo extends AbstractMojo {
     @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
     private File projectDirectory;
     
+    @Parameter(defaultValue = ".java", required = true)
+    private List<String> masks;
+    
     @Override
     public void execute() throws MojoExecutionException, MojoFailureException {
         String now = getCurrentDateTime();
@@ -35,7 +40,7 @@ public class GitStatisticsMojo extends AbstractMojo {
         getLog().info("#### Start executing time: " + now + " ####");
         getLog().info("-------- [Configuration] ----- ");
         getLog().info("| Project directory: " + projectDirectory.getAbsolutePath());
-        getLog().info("| Mask: (value not set)");
+        getLog().info("| Mask: " + masks.stream().collect(Collectors.joining(", ")));
         getLog().info("------------------------------\n");
 
         getLog().info("Parse repository...");
@@ -47,14 +52,13 @@ public class GitStatisticsMojo extends AbstractMojo {
             getLog().info("Current branch: " + repository.getBranch());
 
             Git git = new Git(repository);
-
-            List<String> maskList = Arrays.asList(".java", ".xml");
+            
             List<Path> paths = Files
                     .walk(projectDirectory.toPath())
                     .filter(
                             (path) ->
                                     path.toFile().isFile()
-                                            && maskList.stream().anyMatch((mask) -> path.toString().contains(mask))
+                                            && masks.stream().anyMatch((mask) -> path.toString().contains(mask))
                     )
                     .map((path) -> projectDirectory.toPath().relativize(path))
                     .collect(Collectors.toList());
