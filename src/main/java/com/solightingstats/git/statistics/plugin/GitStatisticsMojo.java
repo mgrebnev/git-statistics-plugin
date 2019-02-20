@@ -1,6 +1,7 @@
 package com.solightingstats.git.statistics.plugin;
 
 import com.solightingstats.git.statistics.plugin.model.Contributor;
+import com.solightingstats.git.statistics.plugin.utils.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableLong;
@@ -52,7 +53,7 @@ public class GitStatisticsMojo extends AbstractMojo {
             getLog().info("Current branch: " + repository.getBranch());
 
             Git git = new Git(repository);
-            
+
             List<Path> paths = Files
                     .walk(projectDirectory.toPath())
                     .filter(
@@ -76,10 +77,10 @@ public class GitStatisticsMojo extends AbstractMojo {
             for (Path path: paths) {
                 try {
                     // lol, but i not found way check untracked files
-                    Iterable<RevCommit> contributionsIterable = git.log().addPath(path.toString()).call();
+                    Iterable<RevCommit> contributionsIterable = git.log().addPath(FileUtils.getOptimizedPath(path)).call();
                     if (contributionsIterable.iterator().hasNext()) {
                         git.log()
-                            .addPath(path.toString())
+                            .addPath(FileUtils.getOptimizedPath(path))
                             .call()
                             .forEach((log) -> {
                                 String currentAuthor = log.getAuthorIdent().getName();
@@ -144,6 +145,7 @@ public class GitStatisticsMojo extends AbstractMojo {
                     });
             
             getLog().info("-------------------------------");
+            getLog().info("");
         } catch (Exception e) {
             throw new MojoExecutionException("Parsing statistics FAILURE! Error message: " + e.getMessage());
         }
