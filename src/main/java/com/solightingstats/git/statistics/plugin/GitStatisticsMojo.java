@@ -1,13 +1,11 @@
 package com.solightingstats.git.statistics.plugin;
 
 import com.solightingstats.git.statistics.plugin.model.Contributor;
-import com.solightingstats.git.statistics.plugin.utils.FileUtils;
-import org.apache.commons.lang3.StringUtils;
+import com.solightingstats.git.statistics.plugin.utils.PrintoutUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableLong;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 import org.eclipse.jgit.api.Git;
@@ -21,9 +19,11 @@ import java.text.DecimalFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.solightingstats.git.statistics.plugin.utils.DateUtils.getCurrentDateTime;
+import static com.solightingstats.git.statistics.plugin.utils.PrintoutUtils.getFormattedColumn;
 
 @Mojo(name = "show")
 public class GitStatisticsMojo extends AbstractMojo {
@@ -35,7 +35,7 @@ public class GitStatisticsMojo extends AbstractMojo {
     private List<String> masks;
     
     @Override
-    public void execute() throws MojoExecutionException, MojoFailureException {
+    public void execute() throws MojoExecutionException {
         String now = getCurrentDateTime();
         
         getLog().info("#### Start executing time: " + now + " ####");
@@ -74,13 +74,19 @@ public class GitStatisticsMojo extends AbstractMojo {
             
             MutableLong trackedFilesCount = new MutableLong(0L);
 
+            final Function<Path, String> 
+                    optimizedPathFunction =
+                                    (path) -> path
+                                                .toString()
+                                                .replaceAll("\\\\", "/");
+
             for (Path path: paths) {
                 try {
-                    // lol, but i not found way check untracked files
-                    Iterable<RevCommit> contributionsIterable = git.log().addPath(FileUtils.getOptimizedPath(path)).call();
+                    final String filePath = optimizedPathFunction.apply(path);
+                    Iterable<RevCommit> contributionsIterable = git.log().addPath(filePath).call();
                     if (contributionsIterable.iterator().hasNext()) {
                         git.log()
-                            .addPath(FileUtils.getOptimizedPath(path))
+                            .addPath(filePath)
                             .call()
                             .forEach((log) -> {
                                 String currentAuthor = log.getAuthorIdent().getName();
@@ -111,37 +117,50 @@ public class GitStatisticsMojo extends AbstractMojo {
             getLog().info("|Errors count: " + countErrors);
 
             getLog().info("");
-
+            
             final MutableInt maxLengthName = new MutableInt(0);
+            final MutableInt maxContributionsLength = new MutableInt(0);
             final MutableInt countAllContributions = new MutableInt(0);
             
             contributors.forEach((key, value) -> {
-                if (key.length() >= maxLengthName.getValue()){
-                    maxLengthName.setValue(key.length());
-                }
+                if (key.length() >= maxLengthName.getValue())
+                    maxLengthName
+                            .setValue(
+                                    key.length()
+                            );
+                
+                if (value.getContributionsCount().toString().length() >= maxContributionsLength.getValue()) 
+                    maxContributionsLength
+                            .setValue(
+                                    value
+                                            .getContributionsCount()
+                                            .toString()
+                                            .length()
+                            );
+                
                 countAllContributions.add(value.getContributionsCount());
             });
 
             final DecimalFormat defaultPercentFormat = new DecimalFormat();
             defaultPercentFormat.setMaximumFractionDigits(2);
             
-            //TODO add general stream for pretty print
             contributors
                     .entrySet()
                     .stream()
                     .map(Map.Entry::getValue)
                     .sorted()
                     .forEach((contributor) -> {
-                        String authorColumn =
-                                contributor.getName().concat(
-                                        StringUtils
-                                                .repeat(" ",maxLengthName.getValue() - contributor.getName().length())
-                                );
+                        final String author = contributor.getName();
+                        final Integer contributions = contributor.getContributionsCount();
+                        final Float contributionsPercent = ((float) contributions / (float) countAllContributions.getValue()) * 100.0f;
                         
-                        Integer authorContributionsCount = contributor.getContributionsCount();
-                        Float contributionsPercent = ((float) authorContributionsCount / (float) countAllContributions.getValue()) * 100.0f;
-                        
-                        getLog().info(authorColumn + " | " + authorContributionsCount + "   [" + defaultPercentFormat.format(contributionsPercent).replace(",", ".") + "%" + "] " );
+                        getLog().info(
+                                getFormattedColumn(author, maxLengthName.getValue()) 
+                              + " | "
+                              + getFormattedColumn(contributions, maxContributionsLength.getValue())
+                              + " | "
+                              + "[" + defaultPercentFormat.format(contributionsPercent).replace(",", ".") + "%" + "] " 
+                        );
                     });
             
             getLog().info("-------------------------------");
