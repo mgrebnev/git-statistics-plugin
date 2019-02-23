@@ -38,7 +38,9 @@ public class GitStatisticsMojo extends AbstractMojo {
     public void execute() throws MojoExecutionException {
         String now = getCurrentDateTime();
         
+        getLog().info("");
         getLog().info("#### Start executing time: " + now + " ####");
+        getLog().info("");
         getLog().info("-------- [Configuration] ----- ");
         getLog().info("| Project directory: " + projectDirectory.getAbsolutePath());
         getLog().info("| Mask: " + masks.stream().collect(Collectors.joining(", ")));
@@ -83,6 +85,7 @@ public class GitStatisticsMojo extends AbstractMojo {
             for (Path path: paths) {
                 try {
                     final String filePath = optimizedPathFunction.apply(path);
+                    
                     Iterable<RevCommit> contributionsIterable = git.log().addPath(filePath).call();
                     if (contributionsIterable.iterator().hasNext()) {
                         git.log()
@@ -159,7 +162,7 @@ public class GitStatisticsMojo extends AbstractMojo {
                               + " | "
                               + getFormattedColumn(contributions, maxContributionsLength.getValue())
                               + " | "
-                              + "[" + defaultPercentFormat.format(contributionsPercent).replace(",", ".") + "%" + "] " 
+                              + defaultPercentFormat.format(contributionsPercent).replace(",", ".") + "%"
                         );
                     });
             
